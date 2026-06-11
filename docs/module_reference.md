@@ -1107,3 +1107,58 @@ Note that the proxy module forwards all method calls to the remote module.
 | Properties | Description                                       | Data type |
 | ---------- | ------------------------------------------------- | --------- |
 | `is_ready` | Whether the remote module has booted and is ready | `bool`    |
+
+## FOC Motor
+
+The FOC motor module drives a brushless gimbal motor with field-oriented control
+(SimpleFOC via the `espressif/esp_simplefoc` IDF component) directly from the Lizard
+MCU. The control loop runs as a dedicated task on core 1 (~5 kHz including the sensor
+read); Lizard's step loop only exchanges targets and telemetry. The motor tracks a
+target angle with velocity feedforward — trajectory modules (e.g. `FocArm`) update
+both every step.
+
+| Constructor | Description | Arguments |
+| ----------- | ----------- | --------- |
+| `foc = FocMotor(a, b, c, en, sda, scl, pp)` | PWM pins a/b/c, driver enable pin, AS5600 I2C pins, pole pairs (24 V supply, 6 V limit) | 7× `int` |
+| `foc = FocMotor(a, b, c, en, sda, scl, pp, vs, vl)` | … plus supply voltage and voltage limit [V] | 7× `int`, 2× `float` |
+
+| Properties | Description | Data type |
+| ---------- | ----------- | --------- |
+| `foc.position` | shaft angle [rad] | `float` |
+| `foc.velocity` | shaft velocity [rad/s] | `float` |
+| `foc.enabled` | drive stage enabled | `bool` |
+| `foc.loop_rate` | FOC loop frequency [Hz] | `int` |
+| `foc.sensor_errors` | cumulative encoder read errors | `int` |
+
+| Methods | Description | Arguments |
+| ------- | ----------- | --------- |
+| `foc.enable()` | energize, hold current angle | |
+| `foc.disable()` | de-energize (freewheel) | |
+| `foc.target(angle)` | track an angle [rad] | `float` |
+
+The module also implements Lizard's generic `Motor` interface (`position`, `speed`,
+`stop`, …), so it composes with `MotorAxis` and friends.
+
+## FOC Arm
+
+A 1-DOF Cartesian arm on a `FocMotor` joint: a long arm on the pivot sweeps a
+horizontal line `h` cm below it; the end effector is the arm/line intersection
+(`x = h·tan θ`). `goto(x)` plans a trapezoidal velocity profile **in Cartesian
+space** and runs the inverse kinematics every step (100 Hz), feeding joint angle
+plus chain-rule velocity feedforward (`θ̇ = ẋ·cos²θ/h`) to the motor.
+
+| Constructor | Description | Arguments |
+| ----------- | ----------- | --------- |
+| `arm = FocArm(foc, h, v, a)` | motor module, line distance [cm], max speed [cm/s], max accel [cm/s²] | `FocMotor`, 3× `float` |
+| `arm = FocArm(foc, h, v, a, g)` | … plus gear ratio (motor rad per arm rad) | …, `float` |
+
+| Properties | Description | Data type |
+| ---------- | ----------- | --------- |
+| `arm.x` | end-effector position along the line [cm] | `float` |
+| `arm.moving` | trajectory in progress | `bool` |
+
+| Methods | Description | Arguments |
+| ------- | ----------- | --------- |
+| `arm.goto(x)` | move end effector to x, trapezoid in Cartesian space | `float` |
+| `arm.goto_joint(x)` | same endpoint, trapezoid in joint space (for contrast/demo) | `float` |
+| `arm.stop()` | abort trajectory, hold position | |
