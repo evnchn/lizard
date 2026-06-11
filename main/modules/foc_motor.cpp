@@ -23,7 +23,7 @@ REGISTER_MODULE(FocMotor, &create_foc_motor)
 const std::map<std::string, Variable_ptr> FocMotor::get_defaults() {
     return {
         {"position", std::make_shared<NumberVariable>()},
-        {"velocity", std::make_shared<NumberVariable>()},
+        {"speed", std::make_shared<NumberVariable>()},
         {"enabled", std::make_shared<BooleanVariable>(false)},
         {"loop_rate", std::make_shared<IntegerVariable>()},
         {"sensor_errors", std::make_shared<IntegerVariable>()},
@@ -42,7 +42,7 @@ FocMotor::FocMotor(const std::string name,
 
 void FocMotor::step() {
     this->properties.at("position")->number_value = this->drive.get_angle();
-    this->properties.at("velocity")->number_value = this->drive.get_velocity();
+    this->properties.at("speed")->number_value = this->drive.get_velocity();
     this->properties.at("enabled")->boolean_value = this->drive.is_enabled();
     this->properties.at("loop_rate")->integer_value = this->drive.get_loop_rate();
     this->properties.at("sensor_errors")->integer_value = this->drive.get_sensor_errors();

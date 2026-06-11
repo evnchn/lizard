@@ -48,6 +48,11 @@ BitBangAS5600::BitBangAS5600(const int sda, const int scl) : sda(sda), scl(scl) 
 }
 
 void BitBangAS5600::init() {
+    if (this->sda < 0 || this->sda > 31 || this->scl < 0 || this->scl > 31) {
+        // direct-register open-drain below uses GPIO.out/enable/in, which cover GPIO 0-31 only;
+        // 1UL << pin would silently wrap for pins >= 32 (Xtensa shifts are mod 32)
+        throw std::runtime_error("BitBangAS5600: sda/scl must be GPIO 0-31");
+    }
     gpio_reset_pin((gpio_num_t)this->sda);
     gpio_reset_pin((gpio_num_t)this->scl);
     gpio_set_direction((gpio_num_t)this->sda, GPIO_MODE_INPUT);
@@ -215,6 +220,12 @@ FocDrive::FocDrive(const int pwm_a, const int pwm_b, const int pwm_c, const int 
                    const int sda, const int scl, const int pole_pairs,
                    const float supply_voltage, const float voltage_limit)
     : impl(new Impl(pwm_a, pwm_b, pwm_c, enable_pin, sda, scl, pole_pairs, supply_voltage, voltage_limit)) {
+    if (pole_pairs < 1) {
+        throw std::runtime_error("FocDrive: pole_pairs must be >= 1");
+    }
+    if (supply_voltage <= 0 || voltage_limit <= 0 || voltage_limit > supply_voltage) {
+        throw std::runtime_error("FocDrive: require 0 < voltage_limit <= supply_voltage");
+    }
 }
 
 void FocDrive::start() {

@@ -29,6 +29,9 @@ const std::map<std::string, Variable_ptr> FocArm::get_defaults() {
 FocArm::FocArm(const std::string name, const FocMotor_ptr motor,
                const double height_cm, const double v_max, const double a_max, const double gear)
     : Module(name), motor(motor), height_cm(height_cm), v_max(v_max), a_max(a_max), gear(gear) {
+    if (height_cm <= 0 || v_max <= 0 || a_max <= 0 || gear == 0) {
+        throw std::runtime_error("FocArm: require height > 0, v_max > 0, a_max > 0, gear != 0");
+    }
     this->properties = FocArm::get_defaults();
 }
 

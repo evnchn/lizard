@@ -1125,7 +1125,7 @@ both every step.
 | Properties | Description | Data type |
 | ---------- | ----------- | --------- |
 | `foc.position` | shaft angle [rad] | `float` |
-| `foc.velocity` | shaft velocity [rad/s] | `float` |
+| `foc.speed` | shaft velocity [rad/s] | `float` |
 | `foc.enabled` | drive stage enabled | `bool` |
 | `foc.loop_rate` | FOC loop frequency [Hz] | `int` |
 | `foc.sensor_errors` | cumulative encoder read errors | `int` |
