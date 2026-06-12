@@ -99,7 +99,7 @@ bool BitBangAS5600::write_byte(uint8_t b) {
         BB_DLY();
         BB_REL(scl_bit);
         BB_DLY();
-        for (int k = 0; k < 200 && !BB_RD(scl_bit); k++) {
+        for (int k = 0; k < 20 && !BB_RD(scl_bit); k++) {
             BB_DLY(); // clock stretch
         }
         BB_LOW(scl_bit);
@@ -122,7 +122,7 @@ uint8_t BitBangAS5600::read_byte(bool ack) {
         BB_DLY();
         BB_REL(scl_bit);
         BB_DLY();
-        for (int k = 0; k < 200 && !BB_RD(scl_bit); k++) {
+        for (int k = 0; k < 20 && !BB_RD(scl_bit); k++) {
             BB_DLY();
         }
         if (BB_RD(sda_bit)) {
@@ -175,10 +175,16 @@ struct FocDrive::Impl {
     BLDCMotor motor;
     BLDCDriver3PWM driver;
     BitBangAS5600 sensor;
-    volatile float target_angle = 0.0f;
-    volatile float target_velocity_ff = 0.0f;
+    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // guards the target tuple (core 0 writes, core 1 reads)
+    float target_angle = 0.0f;
+    float target_velocity_ff = 0.0f;
+    float move_velocity_limit = VEL_MAX;
+    bool velocity_mode = false; // true: reference angle advances by ff each loop (sustained jog)
     volatile bool drive_enabled = false;
+    volatile bool fault = false;
     volatile uint32_t loop_rate_hz = 0;
+    uint32_t last_error_count = 0;
+    uint32_t consecutive_failures = 0;
     const float supply_voltage;
     const float voltage_limit;
 
@@ -192,23 +198,60 @@ struct FocDrive::Impl {
     void run() {
         uint32_t count = 0;
         int64_t window_start = esp_timer_get_time();
+        int64_t last_loop = esp_timer_get_time();
         while (true) {
             this->motor.loopFOC();
+            int64_t now_us = esp_timer_get_time();
+            float dt = (now_us - last_loop) * 1e-6f;
+            last_loop = now_us;
+
+            // sensor-loss failsafe: every loop performs exactly one encoder read;
+            // sustained failures freeze the angle and would wind up the velocity
+            // integrator to full voltage, so trip the drive instead (~50 ms)
+            uint32_t errors_now = this->sensor.errors;
+            if (errors_now != this->last_error_count) {
+                this->consecutive_failures += errors_now - this->last_error_count;
+                this->last_error_count = errors_now;
+                if (this->consecutive_failures > 250 && this->drive_enabled) {
+                    this->drive_enabled = false;
+                    this->fault = true;
+                    this->motor.disable();
+                }
+            } else {
+                this->consecutive_failures = 0;
+            }
+
             float vel_cmd = 0.0f;
             if (this->drive_enabled) {
-                float error = this->target_angle - this->motor.shaft_angle;
-                vel_cmd = this->target_velocity_ff + KP_TRACK * error;
-                vel_cmd = std::min(std::max(vel_cmd, -VEL_MAX), VEL_MAX);
+                taskENTER_CRITICAL(&this->mux);
+                if (this->velocity_mode) {
+                    this->target_angle += this->target_velocity_ff * dt; // sustained jog: reference advances
+                }
+                const float angle = this->target_angle;
+                const float ff = this->target_velocity_ff;
+                const float limit = this->move_velocity_limit;
+                taskEXIT_CRITICAL(&this->mux);
+                float error = angle - this->motor.shaft_angle;
+                vel_cmd = ff + KP_TRACK * error;
+                vel_cmd = std::min(std::max(vel_cmd, -limit), limit);
             }
             this->motor.move(vel_cmd);
             count++;
-            int64_t now = esp_timer_get_time();
-            if (now - window_start >= 1000000) {
+            if (now_us - window_start >= 1000000) {
                 this->loop_rate_hz = count;
                 count = 0;
-                window_start = now;
+                window_start = now_us;
             }
         }
+    }
+
+    void write_target(const float angle, const float ff, const float limit, const bool vel_mode) {
+        taskENTER_CRITICAL(&this->mux);
+        this->target_angle = angle;
+        this->target_velocity_ff = ff;
+        this->move_velocity_limit = limit;
+        this->velocity_mode = vel_mode;
+        taskEXIT_CRITICAL(&this->mux);
     }
 };
 
@@ -253,8 +296,17 @@ void FocDrive::start() {
 }
 
 void FocDrive::set_target(const float angle, const float velocity_ff) {
-    this->impl->target_angle = angle;
-    this->impl->target_velocity_ff = velocity_ff;
+    this->impl->write_target(angle, velocity_ff, VEL_MAX, false);
+}
+
+void FocDrive::set_target_limited(const float angle, const float velocity_limit) {
+    const float limit = velocity_limit > 0 ? std::min(velocity_limit, VEL_MAX) : VEL_MAX;
+    this->impl->write_target(angle, 0.0f, limit, false);
+}
+
+void FocDrive::set_velocity(const float velocity) {
+    const float v = std::min(std::max(velocity, -VEL_MAX), VEL_MAX);
+    this->impl->write_target(this->impl->motor.shaft_angle, v, VEL_MAX, true);
 }
 
 float FocDrive::get_angle() const {
@@ -277,9 +329,15 @@ bool FocDrive::is_enabled() const {
     return this->impl->drive_enabled;
 }
 
+bool FocDrive::is_fault() const {
+    return this->impl->fault;
+}
+
+
 void FocDrive::enable() {
-    this->impl->target_angle = this->impl->motor.shaft_angle;
-    this->impl->target_velocity_ff = 0.0f;
+    this->impl->write_target(this->impl->motor.shaft_angle, 0.0f, VEL_MAX, false);
+    this->impl->fault = false;
+    this->impl->consecutive_failures = 0;
     this->impl->motor.enable();
     this->impl->drive_enabled = true;
 }

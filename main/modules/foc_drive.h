@@ -14,11 +14,14 @@ public:
              const float supply_voltage, const float voltage_limit);
     void start(); // init FOC + spawn the control task on core 1; throws on sensor failure
     void set_target(const float angle, const float velocity_ff);
+    void set_target_limited(const float angle, const float velocity_limit);
+    void set_velocity(const float velocity);
     float get_angle() const;
     float get_velocity() const;
     uint32_t get_loop_rate() const;
     uint32_t get_sensor_errors() const;
     bool is_enabled() const;
+    bool is_fault() const;
     void enable();
     void disable();
 

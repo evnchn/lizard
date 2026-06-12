@@ -1127,6 +1127,7 @@ both every step.
 | `foc.position` | shaft angle [rad] | `float` |
 | `foc.speed` | shaft velocity [rad/s] | `float` |
 | `foc.enabled` | drive stage enabled | `bool` |
+| `foc.fault` | drive tripped by sensor-loss failsafe (re-enable to clear) | `bool` |
 | `foc.loop_rate` | FOC loop frequency [Hz] | `int` |
 | `foc.sensor_errors` | cumulative encoder read errors | `int` |
 
@@ -1135,6 +1136,9 @@ both every step.
 | `foc.enable()` | energize, hold current angle | |
 | `foc.disable()` | de-energize (freewheel) | |
 | `foc.target(angle)` | track an angle [rad] | `float` |
+| `foc.speed(v)` | sustained jog at v [rad/s] | `float` |
+| `foc.position(angle)` | move to angle [rad] | `float` |
+| `foc.position(angle, v)` | move to angle, velocity capped at v [rad/s] | 2× `float` |
 
 The module also implements Lizard's generic `Motor` interface (`position`, `speed`,
 `stop`, …), so it composes with `MotorAxis` and friends.
