@@ -57,3 +57,7 @@ CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n
 CONFIG_FREERTOS_HZ=1000
 
 CONFIG_COMPILER_CXX_RTTI=y
+# esp_simplefoc dependency: i2c_bus v2 backend needs IDF >= 5.4; force legacy backend on 5.3
+CONFIG_I2C_BUS_BACKWARD_CONFIG=y
+# the FocMotor control task busy-loops core 1 at ~5 kHz; don't watchdog its idle task
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=n

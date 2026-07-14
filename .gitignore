@@ -11,3 +11,7 @@ owl_executable
 config.txt
 *.lock
 .venv
+.cache/
+managed_components/
+dependencies.lock
+sdkconfig.defaults.secret
