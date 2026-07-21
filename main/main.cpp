@@ -9,6 +9,8 @@
 #include "compilation/rule.h"
 #include "compilation/variable.h"
 #include "compilation/variable_assignment.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "global.h"
 #include "modules/bluetooth.h"
 #include "modules/core.h"
