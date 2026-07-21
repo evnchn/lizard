@@ -307,7 +307,10 @@ void process_tree(owl_tree *const tree, bool from_expander) {
     }
 }
 
-static constexpr size_t MINIMUM_FREE_HEAP_TO_PARSE = 8192;
+// owl's peak transient allocation scales with the token count of the line, so the
+// required-heap floor scales with its length (base covers a short line's fixed cost).
+static constexpr size_t PARSE_HEAP_BASE = 4096;
+static constexpr size_t PARSE_HEAP_PER_CHAR = 64;
 
 void process_lizard(const char *line, bool trigger_keep_alive, bool from_expander) {
     InterpreterLock lock;
@@ -316,7 +319,7 @@ void process_lizard(const char *line, bool trigger_keep_alive, bool from_expande
     }
 
     // owl's generated parser can abort()/deref under low heap instead of returning an error; drop the line rather than reboot.
-    if (xPortGetFreeHeapSize() < MINIMUM_FREE_HEAP_TO_PARSE) {
+    if (xPortGetFreeHeapSize() < PARSE_HEAP_BASE + PARSE_HEAP_PER_CHAR * strlen(line)) {
         echo("error: not enough free memory to parse");
         return;
     }
