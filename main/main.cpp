@@ -305,10 +305,18 @@ void process_tree(owl_tree *const tree, bool from_expander) {
     }
 }
 
+static constexpr size_t MINIMUM_FREE_HEAP_TO_PARSE = 8192;
+
 void process_lizard(const char *line, bool trigger_keep_alive, bool from_expander) {
     InterpreterLock lock;
     if (trigger_keep_alive) {
         core_module->keep_alive();
+    }
+
+    // owl's generated parser can abort()/deref under low heap instead of returning an error; drop the line rather than reboot.
+    if (xPortGetFreeHeapSize() < MINIMUM_FREE_HEAP_TO_PARSE) {
+        echo("error: not enough free memory to parse");
+        return;
     }
 
     const bool debug = core_module->get_property("debug")->boolean_value;
