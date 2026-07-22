@@ -14,3 +14,13 @@ jobs:
         with:
           python-version: "3.x"
       - uses: pre-commit/action@v3.0.1
+
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and run host tests
+        run: |
+          c++ -std=c++17 -O0 -fsanitize=address,undefined \
+            test/test_uart.cpp main/utils/uart.cpp -Imain/utils -o /tmp/test_uart
+          /tmp/test_uart
