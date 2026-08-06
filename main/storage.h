@@ -17,6 +17,7 @@ public:
     static void remove_from_startup(const std::string substring = "");
     static void print_startup(const std::string substring = "");
     static void save_startup();
+    static std::uint16_t startup_checksum();
     static void clear_nvs();
 
     static void set_user_pin(const std::uint32_t pin);

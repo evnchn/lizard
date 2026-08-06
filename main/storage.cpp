@@ -147,6 +147,14 @@ void Storage::save_startup() {
     Storage::put(Storage::startup);
 }
 
+std::uint16_t Storage::startup_checksum() {
+    uint16_t checksum = 0;
+    for (char const &c : Storage::startup) {
+        checksum += static_cast<uint8_t>(c);
+    }
+    return checksum;
+}
+
 void Storage::clear_nvs() {
     Storage::put("");
 }

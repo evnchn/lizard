@@ -395,6 +395,7 @@ void process_line(const char *line, const int len) {
             break;
         case '.':
             Storage::save_startup();
+            echo("checksum: %04x", Storage::startup_checksum());
             break;
         case '!':
             process_lizard(line + 2);
